@@ -3,7 +3,7 @@ import csv, requests, sys
 # 🔧 Replace this with your Render app URL
 API_BASE = "https://attendance-system-1-1.onrender.com"
 # 🔧 Must match the ADMIN_API_KEY you set in Render environment
-ADMIN_KEY = "supersecretkey123"
+ADMIN_KEY = "supersecretkey@123"
 
 def fetch_map(endpoint):
     """Fetch departments or locations from API and return {name: id} map."""
