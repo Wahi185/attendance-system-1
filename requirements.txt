@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic-settings
+python-multipart
+pandas
+aiofiles
+python-dotenv
+starlette[full]
+email-validator
+pytz

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>QR Debug Test Fixed</title>
+  <!-- Correct QR library include (use jsDelivr CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode/minified/html5-qrcode.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+    #reader { width: 300px; height: 300px; border: 2px solid #333; margin-top: 15px; }
+    #status { margin-top: 10px; font-weight: bold; color: red; }
+    button { padding: 10px 20px; background: #007bff; color: #fff; border: none; border-radius: 5px; cursor: pointer; }
+    button:hover { background: #0056b3; }
+  </style>
+</head>
+<body>
+  <h1>QR Debug Test Fixed</h1>
+  <p>Press the button below to start the QR scanner.</p>
+  
+  <button id="startBtn">Start Scanner</button>
+  <div id="reader"></div>
+  <div id="status"></div>
+
+  <script>
+    let qr;
+
+    document.getElementById("startBtn").onclick = async () => {
+      document.getElementById("status").innerText = "Button clicked!";
+      try {
+        // stop any previous scanner
+        if (qr) { await qr.stop().catch(()=>{}); }
+
+        // init scanner
+        qr = new Html5Qrcode("reader");
+
+        // start with back camera if available
+        await qr.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: 250 },
+          (decodedText) => {
+            document.getElementById("status").innerText = "✅ Scanned: " + decodedText;
+          },
+          (errorMessage) => {
+            // scanning errors (ignored here)
+          }
+        );
+
+      } catch(e) {
+        document.getElementById("status").innerText = "❌ Camera start failed: " + e;
+      }
+    };
+  </script>
+</body>
+</html>
