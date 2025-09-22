@@ -29,80 +29,101 @@
       <input id="mnumber" placeholder="Enter M Number" class="border p-2 w-full rounded"/>
     </div>
 
-    <!-- Scanner -->
+    <!-- Punch Type -->
+    <div class="mb-3">
+      <label class="block text-sm font-medium">Punch Type</label>
+      <select id="action" class="w-full border p-2 rounded">
+        <option value="in">IN</option>
+        <option value="out">OUT</option>
+        <option value="break">BREAK</option>
+      </select>
+    </div>
+
+    <!-- Scanner Controls -->
     <button id="startBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Start Scanner</button>
     <button id="stopBtn" class="bg-gray-500 text-white px-4 py-2 rounded ml-2">Stop Scanner</button>
 
     <div id="reader" class="mt-4 border rounded bg-white" style="width:300px;height:300px;"></div>
     <div id="status" class="mt-4 text-sm"></div>
+
+    <!-- HR Export -->
+    <div class="mt-6">
+      <button id="exportBtn" class="bg-green-600 text-white px-4 py-2 rounded">
+        Download Attendance Report (CSV)
+      </button>
+    </div>
   </div>
 
   <script>
-  const $ = (id) => document.getElementById(id);
-  const API = (path) => path; // relative calls to FastAPI
+    const $ = (id) => document.getElementById(id);
+    const API = (path) => path; // relative to FastAPI
 
-  async function loadOptions() {
-    try {
-      const depts = await fetch(API('/api/departments')).then(r=>r.json());
-      const locs = await fetch(API('/api/locations')).then(r=>r.json());
-      $('department').innerHTML = depts.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
-      $('location').innerHTML = locs.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
-    } catch (err) {
-      $('status').innerHTML = "⚠️ Failed to load departments/locations";
+    async function loadOptions() {
+      try {
+        const depts = await fetch(API('/api/departments')).then(r=>r.json());
+        const locs = await fetch(API('/api/locations')).then(r=>r.json());
+        $('department').innerHTML = depts.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+        $('location').innerHTML = locs.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
+      } catch (err) {
+        $('status').innerHTML = "⚠️ Failed to load departments/locations";
+      }
     }
-  }
 
-  function show(msg, ok=true) {
-    $('status').innerHTML = `<div class="p-2 rounded ${ok?'bg-green-100 text-green-800':'bg-red-100 text-red-800'}">${msg}</div>`;
-  }
+    function show(msg, ok=true) {
+      $('status').innerHTML = `<div class="p-2 rounded ${ok?'bg-green-100 text-green-800':'bg-red-100 text-red-800'}">${msg}</div>`;
+    }
 
-  async function postPunch(qrValue){
-    const payload = {
-      qr_code_value: qrValue,
-      action: "in",
-      m_number: $('mnumber').value || null,
-      location_id: parseInt($('location').value),
-      department_id: parseInt($('department').value),
-      device_label: navigator.userAgent
+    async function postPunch(qrValue){
+      const payload = {
+        qr_code_value: qrValue,
+        action: $('action').value,  // ✅ use Punch Type dropdown
+        m_number: $('mnumber').value || null,
+        location_id: parseInt($('location').value),
+        department_id: parseInt($('department').value),
+        device_label: navigator.userAgent
+      };
+      const res = await fetch(API('/api/punch'), {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if(!res.ok){ throw new Error((await res.json()).detail || 'Punch failed'); }
+      return res.json();
+    }
+
+    let qr;
+    $('startBtn').onclick = async () => {
+      if(qr){ await qr.stop().catch(()=>{}); }
+      qr = new Html5Qrcode("reader");
+      qr.start(
+        { facingMode: "environment" }, 
+        { fps: 10, qrbox: 250 },
+        async (decodedText) => {
+          try {
+            const r = await postPunch(decodedText.trim());
+
+            // ✅ Stop scanner after punch
+            await qr.stop();
+            show(`✅ ${r.employee}: ${r.action.toUpperCase()} at ${new Date(r.ts).toLocaleString()}`);
+
+          } catch (err) {
+            show("❌ " + err.message, false);
+          }
+        },
+        (err) => {}
+      ).catch(e=>show("Camera start failed: " + e, false));
     };
-    const res = await fetch(API('/api/punch'), {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if(!res.ok){ throw new Error((await res.json()).detail || 'Punch failed'); }
-    return res.json();
-  }
 
-  let qr;
-  $('startBtn').onclick = async () => {
-    if(qr){ await qr.stop().catch(()=>{}); }
-    qr = new Html5Qrcode("reader");
-    qr.start(
-      { facingMode: "environment" }, 
-      { fps: 10, qrbox: 250 },
-      async (decodedText) => {
-        try {
-          const r = await postPunch(decodedText.trim());
+    $('stopBtn').onclick = async () => {
+      if(qr){ await qr.stop().catch(()=>{}); show("⏹️ Scanner stopped", false); }
+    };
 
-          // ✅ Stop scanner after first success
-          await qr.stop();
+    // ✅ HR export button
+    $('exportBtn').onclick = () => {
+      window.location.href = API('/api/export');
+    };
 
-          show(`✅ ${r.employee}: ${r.action.toUpperCase()} at ${new Date(r.ts).toLocaleString()}`);
-        } catch (err) {
-          show("❌ " + err.message, false);
-        }
-      },
-      (err) => {}
-    ).catch(e=>show("Camera start failed: " + e, false));
-  };
-
-  $('stopBtn').onclick = async () => {
-    if(qr){ await qr.stop().catch(()=>{}); show("⏹️ Scanner stopped", false); }
-  };
-
-  loadOptions();
-</script>
-
+    loadOptions();
+  </script>
 </body>
 </html>
