@@ -38,66 +38,71 @@
   </div>
 
   <script>
-    const $ = (id) => document.getElementById(id);
-    const API = (path) => path; // relative calls to FastAPI
+  const $ = (id) => document.getElementById(id);
+  const API = (path) => path; // relative calls to FastAPI
 
-    async function loadOptions() {
-      try {
-        const depts = await fetch(API('/api/departments')).then(r=>r.json());
-        const locs = await fetch(API('/api/locations')).then(r=>r.json());
-        $('department').innerHTML = depts.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
-        $('location').innerHTML = locs.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
-      } catch (err) {
-        $('status').innerHTML = "⚠️ Failed to load departments/locations";
-      }
+  async function loadOptions() {
+    try {
+      const depts = await fetch(API('/api/departments')).then(r=>r.json());
+      const locs = await fetch(API('/api/locations')).then(r=>r.json());
+      $('department').innerHTML = depts.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+      $('location').innerHTML = locs.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
+    } catch (err) {
+      $('status').innerHTML = "⚠️ Failed to load departments/locations";
     }
+  }
 
-    function show(msg, ok=true) {
-      $('status').innerHTML = `<div class="p-2 rounded ${ok?'bg-green-100 text-green-800':'bg-red-100 text-red-800'}">${msg}</div>`;
-    }
+  function show(msg, ok=true) {
+    $('status').innerHTML = `<div class="p-2 rounded ${ok?'bg-green-100 text-green-800':'bg-red-100 text-red-800'}">${msg}</div>`;
+  }
 
-    async function postPunch(qrValue){
-      const payload = {
-        qr_code_value: qrValue,
-        action: "in",
-        m_number: $('mnumber').value || null,
-        location_id: parseInt($('location').value),
-        department_id: parseInt($('department').value),
-        device_label: navigator.userAgent
-      };
-      const res = await fetch(API('/api/punch'), {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if(!res.ok){ throw new Error((await res.json()).detail || 'Punch failed'); }
-      return res.json();
-    }
-
-    let qr;
-    $('startBtn').onclick = async () => {
-      if(qr){ await qr.stop().catch(()=>{}); }
-      qr = new Html5Qrcode("reader");
-      qr.start(
-        { facingMode: "environment" }, 
-        { fps: 10, qrbox: 250 },
-        async (decodedText) => {
-          try {
-            const r = await postPunch(decodedText.trim());
-            show(`✅ ${r.employee}: ${r.action.toUpperCase()} at ${new Date(r.ts).toLocaleString()}`);
-          } catch (err) {
-            show("❌ " + err.message, false);
-          }
-        },
-        (err) => {}
-      ).catch(e=>show("Camera start failed: " + e, false));
+  async function postPunch(qrValue){
+    const payload = {
+      qr_code_value: qrValue,
+      action: "in",
+      m_number: $('mnumber').value || null,
+      location_id: parseInt($('location').value),
+      department_id: parseInt($('department').value),
+      device_label: navigator.userAgent
     };
+    const res = await fetch(API('/api/punch'), {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if(!res.ok){ throw new Error((await res.json()).detail || 'Punch failed'); }
+    return res.json();
+  }
 
-    $('stopBtn').onclick = async () => {
-      if(qr){ await qr.stop().catch(()=>{}); show("⏹️ Scanner stopped", false); }
-    };
+  let qr;
+  $('startBtn').onclick = async () => {
+    if(qr){ await qr.stop().catch(()=>{}); }
+    qr = new Html5Qrcode("reader");
+    qr.start(
+      { facingMode: "environment" }, 
+      { fps: 10, qrbox: 250 },
+      async (decodedText) => {
+        try {
+          const r = await postPunch(decodedText.trim());
 
-    loadOptions();
-  </script>
+          // ✅ Stop scanner after first success
+          await qr.stop();
+
+          show(`✅ ${r.employee}: ${r.action.toUpperCase()} at ${new Date(r.ts).toLocaleString()}`);
+        } catch (err) {
+          show("❌ " + err.message, false);
+        }
+      },
+      (err) => {}
+    ).catch(e=>show("Camera start failed: " + e, false));
+  };
+
+  $('stopBtn').onclick = async () => {
+    if(qr){ await qr.stop().catch(()=>{}); show("⏹️ Scanner stopped", false); }
+  };
+
+  loadOptions();
+</script>
+
 </body>
 </html>
