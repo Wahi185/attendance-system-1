@@ -9,3 +9,4 @@ python-dotenv
 starlette[full]
 email-validator
 pytz
+requests
