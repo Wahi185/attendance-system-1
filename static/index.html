@@ -7,32 +7,32 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode/minified/html5-qrcode.min.js"></script>
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center">
-  <div class="bg-white shadow-lg rounded-xl p-6 w-full max-w-lg">
-    <h1 class="text-2xl font-bold mb-6 text-center">QR Time Punch</h1>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+  <div class="bg-white shadow-xl rounded-2xl p-6 w-full max-w-md">
+    <h1 class="text-2xl font-bold mb-6 text-center text-gray-800">📋 QR Time Punch</h1>
 
     <!-- Department -->
     <div class="mb-4">
-      <label class="block text-sm font-medium mb-1">Department</label>
-      <select id="department" class="w-full border p-2 rounded"></select>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Department</label>
+      <select id="department" class="w-full border p-2 rounded-lg focus:ring-2 focus:ring-blue-500"></select>
     </div>
 
     <!-- Location -->
     <div class="mb-4">
-      <label class="block text-sm font-medium mb-1">Location</label>
-      <select id="location" class="w-full border p-2 rounded"></select>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+      <select id="location" class="w-full border p-2 rounded-lg focus:ring-2 focus:ring-blue-500"></select>
     </div>
 
     <!-- M Number -->
     <div class="mb-4">
-      <label class="block text-sm font-medium mb-1">M Number (optional)</label>
-      <input id="mnumber" placeholder="Enter M Number" class="border p-2 w-full rounded"/>
+      <label class="block text-sm font-medium text-gray-700 mb-1">M Number (optional)</label>
+      <input id="mnumber" placeholder="Enter M Number" class="border p-2 w-full rounded-lg focus:ring-2 focus:ring-blue-500"/>
     </div>
 
     <!-- Punch Type -->
     <div class="mb-4">
-      <label class="block text-sm font-medium mb-1">Punch Type</label>
-      <select id="action" class="w-full border p-2 rounded">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Punch Type</label>
+      <select id="action" class="w-full border p-2 rounded-lg focus:ring-2 focus:ring-blue-500">
         <option value="in">IN</option>
         <option value="out">OUT</option>
         <option value="break">BREAK</option>
@@ -40,24 +40,23 @@
     </div>
 
     <!-- Scanner Controls -->
-    <div class="flex flex-col sm:flex-row gap-2 mb-4">
-      <button id="startBtn" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Start Scanner</button>
-      <button id="stopBtn" class="flex-1 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Stop Scanner</button>
+    <div class="flex gap-2 mb-4">
+      <button id="startBtn" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Start</button>
+      <button id="stopBtn" class="flex-1 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">Stop</button>
     </div>
 
     <!-- QR Scanner -->
-    <div class="flex justify-center">
-      <!-- Responsive square container -->
-      <div id="reader" class="border rounded bg-gray-50 w-full aspect-square max-w-xs mx-auto"></div>
+    <div class="flex justify-center mb-4">
+      <div id="reader" class="border rounded-xl bg-gray-50 aspect-square w-full max-w-xs"></div>
     </div>
 
     <!-- Status -->
-    <div id="status" class="mt-4 text-sm text-center"></div>
+    <div id="status" class="mt-2 text-sm text-center"></div>
 
     <!-- HR Export -->
     <div class="mt-6 text-center">
-      <button id="exportBtn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-        Download Attendance Report (CSV)
+      <button id="exportBtn" class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+        📊 Download Attendance Report (CSV)
       </button>
     </div>
   </div>
@@ -78,7 +77,7 @@
     }
 
     function show(msg, ok=true) {
-      $('status').innerHTML = `<div class="p-2 rounded ${ok?'bg-green-100 text-green-800':'bg-red-100 text-red-800'}">${msg}</div>`;
+      $('status').innerHTML = `<div class="p-2 rounded-lg ${ok?'bg-green-100 text-green-800':'bg-red-100 text-red-800'}">${msg}</div>`;
     }
 
     async function postPunch(qrValue){
@@ -105,10 +104,9 @@
         try { await qr.stop(); } catch (e) { console.warn("Stop error:", e); }
       }
       qr = new Html5Qrcode("reader");
-      const qrboxSize = Math.min(window.innerWidth * 0.8, 250); // responsive size
       qr.start(
         { facingMode: "environment" }, 
-        { fps: 10, qrbox: qrboxSize },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
         async (decodedText) => {
           try {
             const r = await postPunch(decodedText.trim());
