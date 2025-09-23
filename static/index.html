@@ -76,7 +76,7 @@
     async function postPunch(qrValue){
       const payload = {
         qr_code_value: qrValue,
-        action: $('action').value,  // ✅ use Punch Type dropdown
+        action: $('action').value,
         m_number: $('mnumber').value || null,
         location_id: parseInt($('location').value),
         department_id: parseInt($('department').value),
@@ -93,7 +93,9 @@
 
     let qr;
     $('startBtn').onclick = async () => {
-      if(qr){ await qr.stop().catch(()=>{}); }
+      if(qr){
+        try { await qr.stop(); } catch (e) { console.warn("Stop error:", e); }
+      }
       qr = new Html5Qrcode("reader");
       qr.start(
         { facingMode: "environment" }, 
@@ -102,8 +104,10 @@
           try {
             const r = await postPunch(decodedText.trim());
 
-            // ✅ Stop scanner after punch
-            await qr.stop();
+            // ✅ Stop scanner after punch safely
+            if (qr) {
+              try { await qr.stop(); } catch (e) { console.warn("Stop error:", e); }
+            }
             show(`✅ ${r.employee}: ${r.action.toUpperCase()} at ${new Date(r.ts).toLocaleString()}`);
 
           } catch (err) {
@@ -115,7 +119,15 @@
     };
 
     $('stopBtn').onclick = async () => {
-      if(qr){ await qr.stop().catch(()=>{}); show("⏹️ Scanner stopped", false); }
+      if(qr){
+        try {
+          await qr.stop();
+          show("⏹️ Scanner stopped", false);
+        } catch (e) {
+          console.warn("Stop error:", e);
+          show("⚠️ Scanner already stopped", false);
+        }
+      }
     };
 
     // ✅ HR export button
