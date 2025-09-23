@@ -47,7 +47,8 @@
 
     <!-- QR Scanner -->
     <div class="flex justify-center">
-      <div id="reader" class="border rounded bg-gray-50" style="width:100%;max-width:400px;height:300px;"></div>
+      <!-- Responsive square container -->
+      <div id="reader" class="border rounded bg-gray-50 w-full aspect-square max-w-xs mx-auto"></div>
     </div>
 
     <!-- Status -->
@@ -104,9 +105,10 @@
         try { await qr.stop(); } catch (e) { console.warn("Stop error:", e); }
       }
       qr = new Html5Qrcode("reader");
+      const qrboxSize = Math.min(window.innerWidth * 0.8, 250); // responsive size
       qr.start(
         { facingMode: "environment" }, 
-        { fps: 10, qrbox: 250 },
+        { fps: 10, qrbox: qrboxSize },
         async (decodedText) => {
           try {
             const r = await postPunch(decodedText.trim());
