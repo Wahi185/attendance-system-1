@@ -1,4 +1,4 @@
-import io, os
+import io, os, csv
 import pytz
 from datetime import datetime
 from typing import Optional
@@ -82,6 +82,45 @@ def get_db():
 def now_local():
     tz = pytz.timezone(TIMEZONE)
     return datetime.now(tz)
+
+# --- Startup Seeder ---
+@app.on_event("startup")
+def seed_defaults():
+    with SessionLocal() as db:
+        # Default depts/locations
+        default_depts = ["Assembly", "Fabrication", "Electrical", "Admin", "IT"]
+        default_locs = ["Main Shop", "Shop 6", "Field Site", "Office"]
+
+        if db.query(Department).count() == 0:
+            for n in default_depts:
+                db.add(Department(name=n))
+        if db.query(Location).count() == 0:
+            for n in default_locs:
+                db.add(Location(name=n))
+        db.commit()
+
+        # ✅ Auto-seed employees from employees.csv
+        csv_path = "employees.csv"
+        if os.path.isfile(csv_path):
+            dept_map = {d.name: d.id for d in db.query(Department)}
+            loc_map = {l.name: l.id for l in db.query(Location)}
+            existing_qrs = {e.qr_code_value for e in db.query(Employee).all()}
+
+            with open(csv_path, newline="", encoding="utf-8") as f:
+                for row in csv.DictReader(f):
+                    qr = row.get("qr_code_value", "").strip()
+                    name = row.get("name", "").strip()
+                    if not qr or not name or qr in existing_qrs:
+                        continue
+                    dep_id = dept_map.get(row.get("department", "").strip())
+                    loc_id = loc_map.get(row.get("location", "").strip())
+                    db.add(Employee(
+                        name=name,
+                        qr_code_value=qr,
+                        department_id=dep_id,
+                        location_id=loc_id
+                    ))
+            db.commit()
 
 # --- Schemas ---
 class EmployeeCreate(BaseModel):
