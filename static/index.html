@@ -111,20 +111,37 @@
         try { await qr.stop(); } catch (e) { console.warn("Stop error:", e); }
       }
       qr = new Html5Qrcode("reader");
-      qr.start(
-        { facingMode: "environment" }, 
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        async (decodedText) => {
-          try {
-            const r = await postPunch(decodedText.trim());
-            if (qr) { try { await qr.stop(); } catch (e) { console.warn("Stop error:", e); } }
-            show(`✅ ${r.employee}: ${r.action.toUpperCase()} at ${new Date(r.ts).toLocaleString()}`);
-          } catch (err) {
-            show("❌ " + err.message, false);
+
+      Html5Qrcode.getCameras().then(cameras => {
+        if (cameras && cameras.length) {
+          // Pick wide/back camera if available
+          let cameraId = cameras[0].id;
+          for (let cam of cameras) {
+            if (cam.label.toLowerCase().includes("wide")) {
+              cameraId = cam.id;
+              break;
+            }
           }
-        },
-        (err) => {}
-      ).catch(e=>show("Camera start failed: " + e, false));
+
+          qr.start(
+            cameraId,
+            { fps: 30, qrbox: { width: 250, height: 250 }, disableDuplicateScanSuppression: true },
+            async (decodedText) => {
+              try {
+                const r = await postPunch(decodedText.trim());
+                if (qr) { try { await qr.stop(); } catch (e) {} }
+                if (navigator.vibrate) navigator.vibrate(200); // buzz feedback
+                show(`✅ ${r.employee}: ${r.action.toUpperCase()} at ${new Date(r.ts).toLocaleString()}`);
+              } catch (err) {
+                show("❌ " + err.message, false);
+              }
+            },
+            (err) => {}
+          ).catch(e=>show("Camera start failed: " + e, false));
+        } else {
+          show("❌ No cameras found", false);
+        }
+      }).catch(err => show("❌ Camera error: " + err, false));
     };
 
     $('stopBtn').onclick = async () => {
