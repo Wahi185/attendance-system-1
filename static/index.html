@@ -63,7 +63,7 @@
     <!-- HR Export -->
     <div class="mt-6 text-center">
       <button id="exportBtn" class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-        📊 Download Attendance Report (CSV)
+        📊 Download Attendance Report (Excel)
       </button>
     </div>
   </div>
@@ -132,8 +132,9 @@
             { fps: 20, qrbox: { width: 250, height: 250 }, disableDuplicateScanSuppression: true },
             async (decodedText) => {
               try {
-                const r = await postPunch(decodedText.trim());
+                // Stop scanner immediately after first scan ✅
                 if (qr) { try { await qr.stop(); } catch (e) {} }
+                const r = await postPunch(decodedText.trim());
                 if (navigator.vibrate) navigator.vibrate(200);
                 show(`✅ ${r.employee}: ${r.action.toUpperCase()} at ${new Date(r.ts).toLocaleString()}`);
               } catch (err) {
