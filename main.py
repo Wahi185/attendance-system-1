@@ -198,16 +198,33 @@ def list_locations(db: Session = Depends(get_db)):
 def export_csv(db: Session = Depends(get_db)):
     output = io.StringIO()
     writer = csv.writer(output)
+
+    # Header
     writer.writerow(["Employee", "Department", "Location", "Action", "M_Number", "Timestamp"])
-    for p in db.query(Punch).all():
+
+    punches = (
+        db.query(Punch)
+        .join(Employee)
+        .order_by(Employee.name.asc(), Punch.ts.asc())
+        .all()
+    )
+
+    last_emp = None
+    for p in punches:
+        if last_emp and last_emp != (p.employee.name if p.employee else None):
+            # blank line between employees
+            writer.writerow([])
+
         writer.writerow([
             p.employee.name if p.employee else "",
             p.department.name if p.department else "",
             p.location.name if p.location else "",
-            p.action,
+            p.action.upper(),
             p.m_number or "",
-            p.ts.isoformat()
+            p.ts.strftime("%Y-%m-%d %H:%M:%S")
         ])
+        last_emp = p.employee.name if p.employee else None
+
     output.seek(0)
     return StreamingResponse(
         output,
