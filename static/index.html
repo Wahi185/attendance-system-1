@@ -3,38 +3,71 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>QR Time Punch</title>
+  <title>HAL9000 QR Time Punch</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode/minified/html5-qrcode.min.js"></script>
+  <style>
+    body {
+      background: radial-gradient(circle at center, #111 0%, #000 100%);
+      font-family: 'Orbitron', sans-serif;
+      color: #eee;
+    }
+    .hal-eye {
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: radial-gradient(circle at center, red 0%, darkred 60%, #111 100%);
+      box-shadow: 0 0 40px rgba(255,0,0,0.8), inset 0 0 20px rgba(255,150,150,0.5);
+      animation: pulse 3s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 0 40px rgba(255,0,0,0.8), inset 0 0 20px rgba(255,150,150,0.5); }
+      50% { box-shadow: 0 0 80px rgba(255,0,0,1), inset 0 0 30px rgba(255,150,150,0.8); }
+    }
+    .neon-btn {
+      background: transparent;
+      border: 2px solid #0ff;
+      color: #0ff;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      text-transform: uppercase;
+      font-weight: bold;
+      transition: 0.2s;
+    }
+    .neon-btn:hover {
+      background: #0ff;
+      color: #000;
+      box-shadow: 0 0 15px #0ff;
+    }
+    #status div {
+      font-size: 1.2rem;
+      margin-top: 1rem;
+      text-shadow: 0 0 10px currentColor;
+    }
+  </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
-  <div class="bg-white shadow-2xl rounded-2xl p-6 w-full max-w-md">
-    <h1 class="text-2xl font-bold mb-6 text-center text-gray-800">
-      📋 Optimil QR Time Punch System
-    </h1>
+<body class="flex items-center justify-center min-h-screen">
+  <div class="flex flex-col items-center text-center space-y-6">
+    <h1 class="text-3xl font-bold tracking-widest">OPTIMIL QR TIME PUNCH</h1>
 
-    <!-- Department -->
-    <div class="mb-4">
-      <label class="block text-sm font-medium text-gray-700 mb-1">Department</label>
-      <select id="department" class="w-full border p-2 rounded-lg focus:ring-2 focus:ring-blue-500"></select>
+    <!-- HAL Eye -->
+    <div class="hal-eye relative flex items-center justify-center">
+      <div id="reader" class="absolute w-48 h-48 opacity-0"></div>
     </div>
 
-    <!-- Location -->
-    <div class="mb-4">
-      <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
-      <select id="location" class="w-full border p-2 rounded-lg focus:ring-2 focus:ring-blue-500"></select>
-    </div>
+    <!-- Status -->
+    <div id="status" class="text-lg"></div>
 
-    <!-- M Number -->
-    <div class="mb-4">
-      <label class="block text-sm font-medium text-gray-700 mb-1">M Number (optional)</label>
-      <input id="mnumber" placeholder="Enter M Number" class="border p-2 w-full rounded-lg focus:ring-2 focus:ring-blue-500"/>
+    <!-- Controls -->
+    <div class="flex space-x-4">
+      <button id="startBtn" class="neon-btn">▶ Start</button>
+      <button id="stopBtn" class="neon-btn">⏹ Stop</button>
     </div>
 
     <!-- Punch Type -->
-    <div class="mb-4">
-      <label class="block text-sm font-medium text-gray-700 mb-1">Punch Type</label>
-      <select id="action" class="w-full border p-2 rounded-lg focus:ring-2 focus:ring-blue-500">
+    <div>
+      <label class="block mb-1">Punch Type</label>
+      <select id="action" class="bg-black border border-gray-600 p-2 rounded text-cyan-400">
         <option value="in">IN</option>
         <option value="out">OUT</option>
         <option value="break_in">BREAK IN</option>
@@ -42,58 +75,22 @@
       </select>
     </div>
 
-    <!-- Scanner Controls -->
-    <div class="flex gap-2 mb-4">
-      <button id="startBtn" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-        ▶️ Start
-      </button>
-      <button id="stopBtn" class="flex-1 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">
-        ⏹️ Stop
-      </button>
-    </div>
-
-    <!-- QR Scanner -->
-    <div class="flex justify-center mb-4">
-      <div id="reader" class="border rounded-xl bg-gray-50 aspect-square w-full max-w-xs"></div>
-    </div>
-
-    <!-- Status -->
-    <div id="status" class="mt-2 text-sm text-center"></div>
-
     <!-- HR Export -->
-    <div class="mt-6 text-center">
-      <button id="exportBtn" class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-        📊 Download Attendance Report (Excel)
-      </button>
-    </div>
+    <button id="exportBtn" class="neon-btn mt-4">📊 Download Report</button>
   </div>
 
   <script>
     const $ = (id) => document.getElementById(id);
     const API = (path) => path; // relative to FastAPI
 
-    async function loadOptions() {
-      try {
-        const depts = await fetch(API('/api/departments')).then(r=>r.json());
-        const locs = await fetch(API('/api/locations')).then(r=>r.json());
-        $('department').innerHTML = depts.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
-        $('location').innerHTML = locs.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
-      } catch (err) {
-        $('status').innerHTML = "⚠️ Failed to load departments/locations";
-      }
-    }
-
     function show(msg, ok=true) {
-      $('status').innerHTML = `<div class="p-2 rounded-lg ${ok?'bg-green-100 text-green-800':'bg-red-100 text-red-800'}">${msg}</div>`;
+      $('status').innerHTML = `<div style="color:${ok?'#0f0':'#f00'}">${msg}</div>`;
     }
 
     async function postPunch(qrValue){
       const payload = {
         qr_code_value: qrValue,
         action: $('action').value,
-        m_number: $('mnumber').value || null,
-        location_id: parseInt($('location').value),
-        department_id: parseInt($('department').value),
         device_label: navigator.userAgent
       };
       const res = await fetch(API('/api/punch'), {
@@ -107,36 +104,26 @@
 
     let qr;
     $('startBtn').onclick = async () => {
-      if(qr){
-        try { await qr.stop(); } catch (e) {}
-      }
+      if(qr){ try { await qr.stop(); } catch (e) {} }
       qr = new Html5Qrcode("reader");
-
       Html5Qrcode.getCameras().then(cameras => {
-        if (cameras && cameras.length) {
-          // Default to last camera (usually back), prefer "back"/"rear"/"wide" if available
+        if (cameras.length) {
           let cameraId = cameras[cameras.length - 1].id;
           for (let cam of cameras) {
-            if (
-              cam.label.toLowerCase().includes("back") || 
-              cam.label.toLowerCase().includes("rear") ||
-              cam.label.toLowerCase().includes("wide")
-            ) {
+            if (cam.label.toLowerCase().includes("back") || cam.label.toLowerCase().includes("wide")) {
               cameraId = cam.id;
               break;
             }
           }
-
           qr.start(
             { deviceId: { exact: cameraId } },
-            { fps: 20, qrbox: { width: 250, height: 250 }, disableDuplicateScanSuppression: true },
+            { fps: 20, qrbox: { width: 200, height: 200 } },
             async (decodedText) => {
               try {
-                // Stop scanner immediately after first scan ✅
                 if (qr) { try { await qr.stop(); } catch (e) {} }
                 const r = await postPunch(decodedText.trim());
                 if (navigator.vibrate) navigator.vibrate(200);
-                show(`✅ ${r.employee}: ${r.action.toUpperCase()} at ${new Date(r.ts).toLocaleString()}`);
+                show(`✅ ${r.employee}: ${r.action.toUpperCase()}`, true);
               } catch (err) {
                 show("❌ " + err.message, false);
               }
@@ -145,7 +132,7 @@
         } else {
           show("❌ No cameras found", false);
         }
-      }).catch(err => show("❌ Camera error: " + err, false));
+      });
     };
 
     $('stopBtn').onclick = async () => {
@@ -156,7 +143,6 @@
     };
 
     $('exportBtn').onclick = () => { window.location.href = API('/api/export'); };
-    loadOptions();
   </script>
 </body>
 </html>
