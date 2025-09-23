@@ -10,3 +10,4 @@ starlette[full]
 email-validator
 pytz
 requests
+openpyxl
