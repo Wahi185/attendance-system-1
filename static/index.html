@@ -3,60 +3,84 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>HAL9000 QR Time Punch</title>
+  <title>Optimil QR Time Punch</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode/minified/html5-qrcode.min.js"></script>
   <style>
     body {
-      background: radial-gradient(circle at center, #111 0%, #000 100%);
-      font-family: 'Orbitron', sans-serif;
-      color: #eee;
+      background: radial-gradient(circle at center, #000 60%, #111 100%);
+      color: #e0e0e0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans",
+                   "Apple Color Emoji", "Segoe UI Emoji";
     }
     .hal-eye {
-      width: 220px;
-      height: 220px;
+      width: 240px;
+      height: 240px;
       border-radius: 50%;
-      background: radial-gradient(circle at center, red 0%, darkred 60%, #111 100%);
-      box-shadow: 0 0 40px rgba(255,0,0,0.8), inset 0 0 20px rgba(255,150,150,0.5);
-      animation: pulse 3s infinite;
+      background: radial-gradient(circle at 30% 30%, #ff4444, #aa0000 60%, #000 100%);
+      box-shadow: 0 0 40px #ff0000, inset 0 0 40px #ff0000;
+      position: relative;
+    }
+    /* circular viewport for the video */
+    .scanner-window {
+      position: absolute;
+      inset: 20px;              /* leave some glowing edge visible */
+      border-radius: 9999px;
+      overflow: hidden;         /* clip video inside the circle */
+    }
+    /* subtle animated pulse */
+    .hal-eye::after{
+      content:"";
+      position:absolute; inset:0;
+      border-radius:50%;
+      box-shadow: 0 0 25px 5px rgba(255,0,0,.25);
+      animation: pulse 2.5s ease-in-out infinite;
     }
     @keyframes pulse {
-      0%,100% { box-shadow: 0 0 40px rgba(255,0,0,0.8), inset 0 0 20px rgba(255,150,150,0.5); }
-      50% { box-shadow: 0 0 80px rgba(255,0,0,1), inset 0 0 30px rgba(255,150,150,0.8); }
+      0%, 100% { box-shadow: 0 0 25px 5px rgba(255,0,0,.25); }
+      50%      { box-shadow: 0 0 45px 14px rgba(255,0,0,.35); }
     }
     .neon-btn {
       background: transparent;
       border: 2px solid #0ff;
       color: #0ff;
-      padding: 0.5rem 1rem;
-      border-radius: 8px;
+      padding: 0.5rem 1.25rem;
+      border-radius: 10px;
+      font-weight: 700;
       text-transform: uppercase;
-      font-weight: bold;
-      transition: 0.2s;
+      transition: all .15s linear;
+      text-shadow: 0 0 6px #0ff;
     }
-    .neon-btn:hover {
-      background: #0ff;
-      color: #000;
-      box-shadow: 0 0 15px #0ff;
+    .neon-btn:hover { background:#0ff; color:#000; box-shadow:0 0 18px #0ff; }
+
+    select, input {
+      background: #000;
+      color: #0ff;
+      border: 1px solid #0ff;
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+      width: 100%;
+      outline: none;
     }
-    #status div {
-      font-size: 1.2rem;
-      margin-top: 1rem;
-      text-shadow: 0 0 10px currentColor;
-    }
+    label { color:#9ad; font-size:.9rem; margin-bottom:.25rem; display:block; }
+    #status div { margin-top:10px; padding:10px 12px; border-radius:10px; }
   </style>
 </head>
 <body class="flex items-center justify-center min-h-screen">
-  <div class="flex flex-col items-center text-center space-y-6">
-    <h1 class="text-3xl font-bold tracking-widest">OPTIMIL QR TIME PUNCH</h1>
+  <div class="flex flex-col items-center text-center space-y-6 w-full max-w-md px-4">
+    <h1 class="text-3xl font-extrabold tracking-widest text-cyan-400 drop-shadow-lg">
+      OPTIMIL QR TIME PUNCH
+    </h1>
 
-    <!-- HAL Eye -->
-    <div class="hal-eye relative flex items-center justify-center">
-      <div id="reader" class="absolute w-48 h-48 opacity-0"></div>
+    <!-- HAL Eye with circular scanner viewport -->
+    <div class="hal-eye">
+      <div class="scanner-window">
+        <div id="reader" class="w-full h-full"></div>
+      </div>
     </div>
 
     <!-- Status -->
-    <div id="status" class="text-lg"></div>
+    <div id="status" class="text-base w-full max-w-md"></div>
 
     <!-- Controls -->
     <div class="flex space-x-4">
@@ -65,9 +89,9 @@
     </div>
 
     <!-- Punch Type -->
-    <div>
-      <label class="block mb-1">Punch Type</label>
-      <select id="action" class="bg-black border border-gray-600 p-2 rounded text-cyan-400">
+    <div class="w-full text-left">
+      <label for="action">Punch Type</label>
+      <select id="action">
         <option value="in">IN</option>
         <option value="out">OUT</option>
         <option value="break_in">BREAK IN</option>
@@ -75,22 +99,58 @@
       </select>
     </div>
 
+    <!-- Department -->
+    <div class="w-full text-left">
+      <label for="department">Department</label>
+      <select id="department"></select>
+    </div>
+
+    <!-- Location -->
+    <div class="w-full text-left">
+      <label for="location">Location</label>
+      <select id="location"></select>
+    </div>
+
+    <!-- M Number -->
+    <div class="w-full text-left">
+      <label for="mnumber">M Number (optional)</label>
+      <input id="mnumber" placeholder="Enter M Number"/>
+    </div>
+
     <!-- HR Export -->
-    <button id="exportBtn" class="neon-btn mt-4">📊 Download Report</button>
+    <div class="mt-2">
+      <button id="exportBtn" class="neon-btn">📊 Download Attendance (Excel)</button>
+    </div>
   </div>
 
   <script>
     const $ = (id) => document.getElementById(id);
-    const API = (path) => path; // relative to FastAPI
+    const API = (path) => path;
 
     function show(msg, ok=true) {
-      $('status').innerHTML = `<div style="color:${ok?'#0f0':'#f00'}">${msg}</div>`;
+      $('status').innerHTML = `<div class="${ok?'bg-green-900 text-green-300':'bg-red-900 text-red-300'}">${msg}</div>`;
+    }
+
+    async function loadOptions() {
+      try {
+        const [depts, locs] = await Promise.all([
+          fetch(API('/api/departments')).then(r=>r.json()),
+          fetch(API('/api/locations')).then(r=>r.json())
+        ]);
+        $('department').innerHTML = depts.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+        $('location').innerHTML = locs.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
+      } catch {
+        show("⚠️ Failed to load departments/locations", false);
+      }
     }
 
     async function postPunch(qrValue){
       const payload = {
-        qr_code_value: qrValue,
+        qr_code_value: qrValue.trim(),
         action: $('action').value,
+        m_number: $('mnumber').value || null,
+        location_id: parseInt($('location').value),
+        department_id: parseInt($('department').value),
         device_label: navigator.userAgent
       };
       const res = await fetch(API('/api/punch'), {
@@ -98,51 +158,121 @@
         headers: { 'Content-Type':'application/json' },
         body: JSON.stringify(payload)
       });
-      if(!res.ok){ throw new Error((await res.json()).detail || 'Punch failed'); }
+      if(!res.ok){
+        let err = 'Punch failed';
+        try { err = (await res.json()).detail || err; } catch {}
+        throw new Error(err);
+      }
       return res.json();
     }
 
-    let qr;
-    $('startBtn').onclick = async () => {
-      if(qr){ try { await qr.stop(); } catch (e) {} }
-      qr = new Html5Qrcode("reader");
-      Html5Qrcode.getCameras().then(cameras => {
-        if (cameras.length) {
-          let cameraId = cameras[cameras.length - 1].id;
-          for (let cam of cameras) {
-            if (cam.label.toLowerCase().includes("back") || cam.label.toLowerCase().includes("wide")) {
-              cameraId = cam.id;
-              break;
-            }
+    // tiny confirmation beep
+    function beep(){
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AC();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine'; o.frequency.value = 880;
+        o.connect(g); g.connect(ctx.destination);
+        g.gain.value = 0.0001;
+        o.start();
+        const t = ctx.currentTime;
+        g.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+        o.stop(t + 0.2);
+      } catch {}
+    }
+
+    let qr = null;
+    let scanning = false;
+
+    function dynamicQrboxCalculator(viewfinderWidth, viewfinderHeight) {
+      // keep the scan box comfortably inside the circular window
+      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+      return Math.floor(minEdge * 0.8);
+    }
+
+    async function startScanner() {
+      if (scanning) return;
+      scanning = true;
+
+      try {
+        if (qr) { try { await qr.stop(); } catch {} }
+        qr = new Html5Qrcode("reader", { verbose: false });
+
+        const cameras = await Html5Qrcode.getCameras();
+
+        // choose best back/wide camera when labels are available
+        let preferred = null;
+        if (cameras && cameras.length) {
+          for (const cam of cameras) {
+            const lbl = (cam.label || "").toLowerCase();
+            if (lbl.includes("back") || lbl.includes("rear") || lbl.includes("wide")) { preferred = cam.id; break; }
           }
-          qr.start(
-            { deviceId: { exact: cameraId } },
-            { fps: 20, qrbox: { width: 200, height: 200 } },
-            async (decodedText) => {
-              try {
-                if (qr) { try { await qr.stop(); } catch (e) {} }
-                const r = await postPunch(decodedText.trim());
-                if (navigator.vibrate) navigator.vibrate(200);
-                show(`✅ ${r.employee}: ${r.action.toUpperCase()}`, true);
-              } catch (err) {
-                show("❌ " + err.message, false);
-              }
-            }
-          ).catch(e=>show("Camera start failed: " + e, false));
-        } else {
-          show("❌ No cameras found", false);
+          if (!preferred) preferred = cameras[cameras.length - 1].id; // fallback to last (often rear)
         }
-      });
-    };
 
-    $('stopBtn').onclick = async () => {
-      if(qr){
-        try { await qr.stop(); show("⏹️ Scanner stopped", false); }
-        catch (e) { show("⚠️ Scanner already stopped", false); }
+        const config = {
+          fps: 24,
+          qrbox: dynamicQrboxCalculator,
+          // reduce throttling for snappier decode
+          aspectRatio: 1.0,
+          // disable duplicate suppression since we stop on first scan anyway
+        };
+
+        const onSuccess = async (decodedText) => {
+          try {
+            // stop ASAP to prevent multi reads
+            if (qr) { try { await qr.stop(); } catch {} }
+            scanning = false;
+
+            const r = await postPunch(decodedText);
+            if (navigator.vibrate) navigator.vibrate(180);
+            beep();
+            show(`✅ ${r.employee}: ${r.action.toUpperCase()} at ${new Date(r.ts).toLocaleString()}`);
+          } catch (e) {
+            show("❌ " + e.message, false);
+          }
+        };
+
+        // robust start sequence with fallbacks
+        try {
+          if (preferred) {
+            await qr.start({ deviceId: { exact: preferred } }, config, onSuccess);
+          } else {
+            // prefer environment if available
+            await qr.start({ facingMode: { exact: "environment" } }, config, onSuccess);
+          }
+        } catch {
+          try {
+            await qr.start({ facingMode: "environment" }, config, onSuccess);
+          } catch {
+            // final fallback: just start with any camera
+            await qr.start({ facingMode: "user" }, config, onSuccess);
+          }
+        }
+
+        show("📷 Scanner ready. Present QR code…");
+      } catch (e) {
+        scanning = false;
+        show("Camera start failed: " + (e?.message || e), false);
       }
-    };
+    }
 
-    $('exportBtn').onclick = () => { window.location.href = API('/api/export'); };
+    async function stopScanner() {
+      if (qr) {
+        try { await qr.stop(); show("⏹️ Scanner stopped", false); }
+        catch { show("⚠️ Scanner already stopped", false); }
+      }
+      scanning = false;
+    }
+
+    $('startBtn').addEventListener('click', startScanner);
+    $('stopBtn').addEventListener('click', stopScanner);
+    $('exportBtn').addEventListener('click', () => window.location.href = API('/api/export'));
+
+    loadOptions();
   </script>
 </body>
 </html>
