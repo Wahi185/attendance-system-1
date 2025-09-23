@@ -1,4 +1,4 @@
-import io, os, csv
+import os, csv
 import pytz
 from datetime import datetime
 from typing import Optional
@@ -198,6 +198,7 @@ def list_locations(db: Session = Depends(get_db)):
 def export_excel(db: Session = Depends(get_db)):
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment
+    from io import BytesIO   # ✅ added so it won’t break
 
     wb = Workbook()
     ws = wb.active
@@ -275,7 +276,6 @@ def export_excel(db: Session = Depends(get_db)):
             c.alignment = Alignment(horizontal="center", vertical="center")
 
     # Stream back as Excel
-    from io import BytesIO
     stream = BytesIO()
     wb.save(stream)
     stream.seek(0)
