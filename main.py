@@ -200,6 +200,7 @@ def list_locations(db: Session = Depends(get_db)):
 def export_excel(db: Session = Depends(get_db)):
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment
+    from openpyxl.utils import get_column_letter
     from io import BytesIO
 
     wb = Workbook()
@@ -213,7 +214,7 @@ def export_excel(db: Session = Depends(get_db)):
     ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
 
     # Header row
-    headers = ["Empl", "Date", "Dept", "Loc", "Action", "M_Number", "Timestamp", "Duration"]
+    headers = ["Employee", "Date", "Department", "Location", "Action", "M_Number", "Timestamp", "Duration"]
     ws.append(headers)
     for col in range(1, len(headers) + 1):
         c = ws.cell(row=2, column=col)
@@ -233,7 +234,6 @@ def export_excel(db: Session = Depends(get_db)):
     else:
         last_emp, last_date = None, None
         in_time, total_for_day = None, 0
-        row_idx = 3
 
         for p in punches:
             emp_name = p.employee.name if p.employee else ""
@@ -242,7 +242,6 @@ def export_excel(db: Session = Depends(get_db)):
             if last_date and last_date != punch_date:
                 ws.append([last_emp, last_date, "", "", "TOTAL", "", "", f"{round(total_for_day/3600,2)}h"])
                 total_for_day, in_time = 0, None
-                row_idx += 1
 
             duration_str = ""
             if p.action.lower() in ["in", "break_in"]:
@@ -266,19 +265,23 @@ def export_excel(db: Session = Depends(get_db)):
                 duration_str,
             ]
             ws.append(row)
-
-            for col in range(1, len(row) + 1):
-                ws.cell(row=row_idx, column=col).alignment = Alignment(horizontal="center", vertical="center")
-
-            row_idx += 1
             last_emp, last_date = emp_name, punch_date
 
         if last_emp and last_date:
             ws.append([last_emp, last_date, "", "", "TOTAL", "", "", f"{round(total_for_day/3600,2)}h"])
-            for col in range(1, 9):
-                c = ws.cell(row=row_idx, column=col)
-                c.font = Font(bold=True)
-                c.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Auto adjust column widths
+    for col in ws.columns:
+        max_length = 0
+        column = get_column_letter(col[0].column)
+        for cell in col:
+            try:
+                if cell.value:
+                    max_length = max(max_length, len(str(cell.value)))
+            except:
+                pass
+        adjusted_width = max_length + 2
+        ws.column_dimensions[column].width = adjusted_width
 
     # Stream back as Excel
     stream = BytesIO()
