@@ -108,35 +108,38 @@
     let qr;
     $('startBtn').onclick = async () => {
       if(qr){
-        try { await qr.stop(); } catch (e) { console.warn("Stop error:", e); }
+        try { await qr.stop(); } catch (e) {}
       }
       qr = new Html5Qrcode("reader");
 
       Html5Qrcode.getCameras().then(cameras => {
         if (cameras && cameras.length) {
-          // Pick wide/back camera if available
-          let cameraId = cameras[0].id;
+          // Default to last camera (usually back), prefer "back"/"rear"/"wide" if available
+          let cameraId = cameras[cameras.length - 1].id;
           for (let cam of cameras) {
-            if (cam.label.toLowerCase().includes("wide")) {
+            if (
+              cam.label.toLowerCase().includes("back") || 
+              cam.label.toLowerCase().includes("rear") ||
+              cam.label.toLowerCase().includes("wide")
+            ) {
               cameraId = cam.id;
               break;
             }
           }
 
           qr.start(
-            cameraId,
-            { fps: 30, qrbox: { width: 250, height: 250 }, disableDuplicateScanSuppression: true },
+            { deviceId: { exact: cameraId } },
+            { fps: 20, qrbox: { width: 250, height: 250 }, disableDuplicateScanSuppression: true },
             async (decodedText) => {
               try {
                 const r = await postPunch(decodedText.trim());
                 if (qr) { try { await qr.stop(); } catch (e) {} }
-                if (navigator.vibrate) navigator.vibrate(200); // buzz feedback
+                if (navigator.vibrate) navigator.vibrate(200);
                 show(`✅ ${r.employee}: ${r.action.toUpperCase()} at ${new Date(r.ts).toLocaleString()}`);
               } catch (err) {
                 show("❌ " + err.message, false);
               }
-            },
-            (err) => {}
+            }
           ).catch(e=>show("Camera start failed: " + e, false));
         } else {
           show("❌ No cameras found", false);
@@ -147,7 +150,7 @@
     $('stopBtn').onclick = async () => {
       if(qr){
         try { await qr.stop(); show("⏹️ Scanner stopped", false); }
-        catch (e) { console.warn("Stop error:", e); show("⚠️ Scanner already stopped", false); }
+        catch (e) { show("⚠️ Scanner already stopped", false); }
       }
     };
 
