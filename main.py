@@ -5,6 +5,7 @@ import pytz
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Index
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship, Session
@@ -60,8 +61,6 @@ class Punch(Base):
     department = relationship("Department")
 
 Index("ix_punches_range", Punch.employee_id, Punch.ts)
-
-# Create tables
 Base.metadata.create_all(engine)
 
 # --- FastAPI app ---
@@ -88,7 +87,6 @@ def now_local():
 DEFAULT_DEPTS = ["Assembly", "Fabrication", "Electrical", "Admin", "IT"]
 DEFAULT_LOCS = ["Main Shop", "Shop 6", "Field Site", "Office"]
 
-# ✅ Seed defaults at startup
 @app.on_event("startup")
 def seed_defaults():
     with SessionLocal() as db:
@@ -133,6 +131,10 @@ def create_employee(payload: EmployeeCreate, db: Session = Depends(get_db), _: N
     db.refresh(emp)
     return {"id": emp.id, "name": emp.name}
 
+@app.get("/api/employees")
+def list_employees(db: Session = Depends(get_db), _: None = Depends(require_admin)):
+    return [{"id": e.id, "name": e.name, "qr": e.qr_code_value} for e in db.query(Employee).all()]
+
 @app.post("/api/punch")
 def punch(payload: PunchIn, db: Session = Depends(get_db)):
     emp = db.query(Employee).filter_by(qr_code_value=payload.qr_code_value, active=True).first()
@@ -157,7 +159,26 @@ def list_departments(db: Session = Depends(get_db)):
 def list_locations(db: Session = Depends(get_db)):
     return [{"id": l.id, "name": l.name} for l in db.query(Location)]
 
-from fastapi.responses import FileResponse
+@app.get("/api/export")
+def export_csv(db: Session = Depends(get_db)):
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Employee", "Department", "Location", "Action", "M_Number", "Timestamp"])
+    for p in db.query(Punch).all():
+        writer.writerow([
+            p.employee.name if p.employee else "",
+            p.department.name if p.department else "",
+            p.location.name if p.location else "",
+            p.action,
+            p.m_number or "",
+            p.ts.isoformat()
+        ])
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=attendance.csv"}
+    )
 
 @app.get("/")
 def root():
