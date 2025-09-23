@@ -1,7 +1,7 @@
 import csv, requests, sys
 
 API_BASE = "https://attendance-system-1-1.onrender.com"
-ADMIN_KEY = "supersecretkey@123"
+ADMIN_KEY = "supersecretkey123"
 
 
 def fetch_map(endpoint):

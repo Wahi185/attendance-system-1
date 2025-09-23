@@ -90,6 +90,7 @@ DEFAULT_LOCS = ["Main Shop", "Shop 6", "Field Site", "Office"]
 @app.on_event("startup")
 def seed_defaults():
     with SessionLocal() as db:
+        # Seed departments/locations
         if db.query(Department).count() == 0:
             for n in DEFAULT_DEPTS:
                 db.add(Department(name=n))
@@ -97,6 +98,29 @@ def seed_defaults():
             for n in DEFAULT_LOCS:
                 db.add(Location(name=n))
         db.commit()
+
+        # Auto-seed employees from CSV if present
+        csv_path = "employees.csv"
+        if os.path.isfile(csv_path):
+            dept_map = {d.name: d.id for d in db.query(Department)}
+            loc_map = {l.name: l.id for l in db.query(Location)}
+            existing_qrs = {e.qr_code_value for e in db.query(Employee).all()}
+
+            with open(csv_path, newline="", encoding="utf-8") as f:
+                for row in csv.DictReader(f):
+                    qr = row.get("qr_code_value", "").strip()
+                    name = row.get("name", "").strip()
+                    if not qr or not name or qr in existing_qrs:
+                        continue
+                    dep_id = dept_map.get(row.get("department", "").strip())
+                    loc_id = loc_map.get(row.get("location", "").strip())
+                    db.add(Employee(
+                        name=name,
+                        qr_code_value=qr,
+                        department_id=dep_id,
+                        location_id=loc_id
+                    ))
+            db.commit()
 
 # --- Schemas ---
 class EmployeeCreate(BaseModel):
@@ -141,7 +165,7 @@ def punch(payload: PunchIn, db: Session = Depends(get_db)):
     if not emp:
         raise HTTPException(404, "Employee not found")
 
-    # --- Duplicate prevention ---
+    # Duplicate prevention
     last = (
         db.query(Punch)
         .filter(Punch.employee_id == emp.id)

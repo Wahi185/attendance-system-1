@@ -7,31 +7,31 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode/minified/html5-qrcode.min.js"></script>
 </head>
-<body class="bg-gray-100">
-  <div class="max-w-xl mx-auto p-4">
-    <h1 class="text-2xl font-bold mb-4">QR Time Punch</h1>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+  <div class="bg-white shadow-lg rounded-xl p-6 w-full max-w-lg">
+    <h1 class="text-2xl font-bold mb-6 text-center">QR Time Punch</h1>
 
     <!-- Department -->
-    <div class="mb-3">
-      <label class="block text-sm font-medium">Department</label>
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-1">Department</label>
       <select id="department" class="w-full border p-2 rounded"></select>
     </div>
 
     <!-- Location -->
-    <div class="mb-3">
-      <label class="block text-sm font-medium">Location</label>
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-1">Location</label>
       <select id="location" class="w-full border p-2 rounded"></select>
     </div>
 
     <!-- M Number -->
-    <div class="mb-3">
-      <label class="block text-sm font-medium">M Number (optional)</label>
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-1">M Number (optional)</label>
       <input id="mnumber" placeholder="Enter M Number" class="border p-2 w-full rounded"/>
     </div>
 
     <!-- Punch Type -->
-    <div class="mb-3">
-      <label class="block text-sm font-medium">Punch Type</label>
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-1">Punch Type</label>
       <select id="action" class="w-full border p-2 rounded">
         <option value="in">IN</option>
         <option value="out">OUT</option>
@@ -40,15 +40,22 @@
     </div>
 
     <!-- Scanner Controls -->
-    <button id="startBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Start Scanner</button>
-    <button id="stopBtn" class="bg-gray-500 text-white px-4 py-2 rounded ml-2">Stop Scanner</button>
+    <div class="flex flex-col sm:flex-row gap-2 mb-4">
+      <button id="startBtn" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Start Scanner</button>
+      <button id="stopBtn" class="flex-1 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Stop Scanner</button>
+    </div>
 
-    <div id="reader" class="mt-4 border rounded bg-white" style="width:300px;height:300px;"></div>
-    <div id="status" class="mt-4 text-sm"></div>
+    <!-- QR Scanner -->
+    <div class="flex justify-center">
+      <div id="reader" class="border rounded bg-gray-50" style="width:100%;max-width:400px;height:300px;"></div>
+    </div>
+
+    <!-- Status -->
+    <div id="status" class="mt-4 text-sm text-center"></div>
 
     <!-- HR Export -->
-    <div class="mt-6">
-      <button id="exportBtn" class="bg-green-600 text-white px-4 py-2 rounded">
+    <div class="mt-6 text-center">
+      <button id="exportBtn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
         Download Attendance Report (CSV)
       </button>
     </div>
@@ -103,13 +110,8 @@
         async (decodedText) => {
           try {
             const r = await postPunch(decodedText.trim());
-
-            // ✅ Stop scanner after punch safely
-            if (qr) {
-              try { await qr.stop(); } catch (e) { console.warn("Stop error:", e); }
-            }
+            if (qr) { try { await qr.stop(); } catch (e) { console.warn("Stop error:", e); } }
             show(`✅ ${r.employee}: ${r.action.toUpperCase()} at ${new Date(r.ts).toLocaleString()}`);
-
           } catch (err) {
             show("❌ " + err.message, false);
           }
@@ -120,21 +122,12 @@
 
     $('stopBtn').onclick = async () => {
       if(qr){
-        try {
-          await qr.stop();
-          show("⏹️ Scanner stopped", false);
-        } catch (e) {
-          console.warn("Stop error:", e);
-          show("⚠️ Scanner already stopped", false);
-        }
+        try { await qr.stop(); show("⏹️ Scanner stopped", false); }
+        catch (e) { console.warn("Stop error:", e); show("⚠️ Scanner already stopped", false); }
       }
     };
 
-    // ✅ HR export button
-    $('exportBtn').onclick = () => {
-      window.location.href = API('/api/export');
-    };
-
+    $('exportBtn').onclick = () => { window.location.href = API('/api/export'); };
     loadOptions();
   </script>
 </body>
