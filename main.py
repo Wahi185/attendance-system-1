@@ -1,7 +1,7 @@
-import csv, io, os
+import io, os
+import pytz
 from datetime import datetime
 from typing import Optional
-import pytz
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -83,44 +83,6 @@ def now_local():
     tz = pytz.timezone(TIMEZONE)
     return datetime.now(tz)
 
-# Default values
-DEFAULT_DEPTS = ["Assembly", "Fabrication", "Electrical", "Admin", "IT"]
-DEFAULT_LOCS = ["Main Shop", "Shop 6", "Field Site", "Office"]
-
-@app.on_event("startup")
-def seed_defaults():
-    with SessionLocal() as db:
-        if db.query(Department).count() == 0:
-            for n in DEFAULT_DEPTS:
-                db.add(Department(name=n))
-        if db.query(Location).count() == 0:
-            for n in DEFAULT_LOCS:
-                db.add(Location(name=n))
-        db.commit()
-
-        # Auto-seed employees from CSV if present
-        csv_path = "employees.csv"
-        if os.path.isfile(csv_path):
-            dept_map = {d.name: d.id for d in db.query(Department)}
-            loc_map = {l.name: l.id for l in db.query(Location)}
-            existing_qrs = {e.qr_code_value for e in db.query(Employee).all()}
-
-            with open(csv_path, newline="", encoding="utf-8") as f:
-                for row in csv.DictReader(f):
-                    qr = row.get("qr_code_value", "").strip()
-                    name = row.get("name", "").strip()
-                    if not qr or not name or qr in existing_qrs:
-                        continue
-                    dep_id = dept_map.get(row.get("department", "").strip())
-                    loc_id = loc_map.get(row.get("location", "").strip())
-                    db.add(Employee(
-                        name=name,
-                        qr_code_value=qr,
-                        department_id=dep_id,
-                        location_id=loc_id
-                    ))
-            db.commit()
-
 # --- Schemas ---
 class EmployeeCreate(BaseModel):
     name: str
@@ -164,7 +126,6 @@ def punch(payload: PunchIn, db: Session = Depends(get_db)):
     if not emp:
         raise HTTPException(404, "Employee not found")
 
-    # Duplicate prevention
     last = (
         db.query(Punch)
         .filter(Punch.employee_id == emp.id)
@@ -172,7 +133,7 @@ def punch(payload: PunchIn, db: Session = Depends(get_db)):
         .first()
     )
     if last and last.action == payload.action and (last.m_number or "") == (payload.m_number or ""):
-        raise HTTPException(400, f"Duplicate punch: already '{payload.action.upper()}' for this job")
+        raise HTTPException(400, f"Duplicate punch: already '{payload.action.upper()}'")
 
     ts = now_local().replace(microsecond=0)
     p = Punch(
@@ -193,19 +154,31 @@ def list_departments(db: Session = Depends(get_db)):
 def list_locations(db: Session = Depends(get_db)):
     return [{"id": l.id, "name": l.name} for l in db.query(Location)]
 
+# --- Export Excel ---
 @app.get("/api/export")
-def export_csv(db: Session = Depends(get_db)):
-    output = io.StringIO()
-    writer = csv.writer(output)
+def export_excel(db: Session = Depends(get_db)):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Attendance"
 
     # Title row
-    writer.writerow([])
-    writer.writerow(["", "", "Optimil QR Time Punch System", "", "", ""])
-    writer.writerow([])
+    ws.merge_cells("A1:H1")
+    ws["A1"].value = "Optimil QR Time Punch System"
+    ws["A1"].font = Font(size=14, bold=True)
+    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
 
-    # Header
-    writer.writerow(["Employee", "Date", "Department", "Location", "Action", "M_Number", "Timestamp", "Duration"])
+    # Header row
+    headers = ["Employee", "Date", "Department", "Location", "Action", "M_Number", "Timestamp", "Duration"]
+    ws.append(headers)
+    for col in range(1, len(headers)+1):
+        c = ws.cell(row=2, column=col)
+        c.font = Font(bold=True)
+        c.alignment = Alignment(horizontal="center", vertical="center")
 
+    # Punch rows
     punches = (
         db.query(Punch)
         .join(Employee)
@@ -215,60 +188,63 @@ def export_csv(db: Session = Depends(get_db)):
 
     last_emp, last_date = None, None
     in_time, total_for_day = None, 0
+    row_idx = 3
 
     for p in punches:
         emp_name = p.employee.name if p.employee else ""
         punch_date = p.ts.date().isoformat()
 
-        # Blank line when employee changes
-        if last_emp and last_emp != emp_name:
-            writer.writerow([])
-            last_date = None
-
-        # Daily total row when date changes
         if last_date and last_date != punch_date:
-            writer.writerow([last_emp, last_date, "", "", "TOTAL", "", "", f"{round(total_for_day/3600,2)}h"])
-            writer.writerow([])
-            total_for_day = 0
-            in_time = None
+            ws.append([last_emp, last_date, "", "", "TOTAL", "", "", f"{round(total_for_day/3600,2)}h"])
+            total_for_day, in_time = 0, None
+            row_idx += 1
 
         duration_str = ""
-        if p.action.lower() == "in":
+        if p.action.lower() in ["in", "break_in"]:
             in_time = p.ts
-        elif p.action.lower() == "out" and in_time:
+        elif p.action.lower() in ["out", "break_out"] and in_time:
             delta = (p.ts - in_time).total_seconds()
-            duration_str = f"{int(delta//3600)}h {int((delta%3600)//60)}m"
+            hours = int(delta // 3600)
+            mins = int((delta % 3600) // 60)
+            duration_str = f"{hours}h {mins}m"
             total_for_day += delta
             in_time = None
-        elif p.action.lower() == "break_in":
-            in_time = p.ts
-        elif p.action.lower() == "break_out" and in_time:
-            delta = (p.ts - in_time).total_seconds()
-            duration_str = f"BREAK {int(delta//3600)}h {int((delta%3600)//60)}m"
-            in_time = None
 
-        writer.writerow([
+        row = [
             emp_name,
             punch_date,
             p.department.name if p.department else "",
             p.location.name if p.location else "",
             p.action.upper(),
             p.m_number or "",
-            p.ts.strftime("%Y-%m-%d %H:%M:%S"),
+            p.ts.strftime("%Y-%m-%d %I:%M:%S %p"),
             duration_str
-        ])
+        ]
+        ws.append(row)
 
+        for col in range(1, len(row)+1):
+            ws.cell(row=row_idx, column=col).alignment = Alignment(horizontal="center", vertical="center")
+
+        row_idx += 1
         last_emp, last_date = emp_name, punch_date
 
-    # Final total row
     if last_emp and last_date:
-        writer.writerow([last_emp, last_date, "", "", "TOTAL", "", "", f"{round(total_for_day/3600,2)}h"])
+        ws.append([last_emp, last_date, "", "", "TOTAL", "", "", f"{round(total_for_day/3600,2)}h"])
+        for col in range(1, 9):
+            c = ws.cell(row=row_idx, column=col)
+            c.font = Font(bold=True)
+            c.alignment = Alignment(horizontal="center", vertical="center")
 
-    output.seek(0)
+    # Stream back as Excel
+    from io import BytesIO
+    stream = BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+
     return StreamingResponse(
-        output,
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=attendance_report.csv"}
+        stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=attendance.xlsx"}
     )
 
 @app.get("/")
