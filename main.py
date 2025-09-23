@@ -140,6 +140,17 @@ def punch(payload: PunchIn, db: Session = Depends(get_db)):
     emp = db.query(Employee).filter_by(qr_code_value=payload.qr_code_value, active=True).first()
     if not emp:
         raise HTTPException(404, "Employee not found")
+
+    # --- Duplicate prevention ---
+    last = (
+        db.query(Punch)
+        .filter(Punch.employee_id == emp.id)
+        .order_by(Punch.ts.desc())
+        .first()
+    )
+    if last and last.action == payload.action and (last.m_number or "") == (payload.m_number or ""):
+        raise HTTPException(400, f"Duplicate punch: already '{payload.action.upper()}' for this job")
+
     ts = now_local().replace(microsecond=0)
     p = Punch(
         employee_id=emp.id, ts=ts, action=payload.action, m_number=payload.m_number,
