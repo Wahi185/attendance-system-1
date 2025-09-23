@@ -8,8 +8,10 @@
   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode/minified/html5-qrcode.min.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
-  <div class="bg-white shadow-xl rounded-2xl p-6 w-full max-w-md">
-    <h1 class="text-2xl font-bold mb-6 text-center text-gray-800">📋 Optimil QR Time Punch System</h1>
+  <div class="bg-white shadow-2xl rounded-2xl p-6 w-full max-w-md">
+    <h1 class="text-2xl font-bold mb-6 text-center text-gray-800">
+      📋 Optimil QR Time Punch System
+    </h1>
 
     <!-- Department -->
     <div class="mb-4">
@@ -35,14 +37,19 @@
       <select id="action" class="w-full border p-2 rounded-lg focus:ring-2 focus:ring-blue-500">
         <option value="in">IN</option>
         <option value="out">OUT</option>
-        <option value="break">BREAK</option>
+        <option value="break_in">BREAK IN</option>
+        <option value="break_out">BREAK OUT</option>
       </select>
     </div>
 
     <!-- Scanner Controls -->
     <div class="flex gap-2 mb-4">
-      <button id="startBtn" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Start</button>
-      <button id="stopBtn" class="flex-1 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">Stop</button>
+      <button id="startBtn" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+        ▶️ Start
+      </button>
+      <button id="stopBtn" class="flex-1 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">
+        ⏹️ Stop
+      </button>
     </div>
 
     <!-- QR Scanner -->

@@ -90,7 +90,6 @@ DEFAULT_LOCS = ["Main Shop", "Shop 6", "Field Site", "Office"]
 @app.on_event("startup")
 def seed_defaults():
     with SessionLocal() as db:
-        # Seed departments/locations
         if db.query(Department).count() == 0:
             for n in DEFAULT_DEPTS:
                 db.add(Department(name=n))
@@ -199,8 +198,13 @@ def export_csv(db: Session = Depends(get_db)):
     output = io.StringIO()
     writer = csv.writer(output)
 
+    # Title row
+    writer.writerow([])
+    writer.writerow(["", "", "Optimil QR Time Punch System", "", "", ""])
+    writer.writerow([])
+
     # Header
-    writer.writerow(["Employee", "Department", "Location", "Action", "M_Number", "Timestamp"])
+    writer.writerow(["Employee", "Date", "Department", "Location", "Action", "M_Number", "Timestamp", "Duration"])
 
     punches = (
         db.query(Punch)
@@ -209,27 +213,62 @@ def export_csv(db: Session = Depends(get_db)):
         .all()
     )
 
-    last_emp = None
+    last_emp, last_date = None, None
+    in_time, total_for_day = None, 0
+
     for p in punches:
-        if last_emp and last_emp != (p.employee.name if p.employee else None):
-            # blank line between employees
+        emp_name = p.employee.name if p.employee else ""
+        punch_date = p.ts.date().isoformat()
+
+        # Blank line when employee changes
+        if last_emp and last_emp != emp_name:
             writer.writerow([])
+            last_date = None
+
+        # Daily total row when date changes
+        if last_date and last_date != punch_date:
+            writer.writerow([last_emp, last_date, "", "", "TOTAL", "", "", f"{round(total_for_day/3600,2)}h"])
+            writer.writerow([])
+            total_for_day = 0
+            in_time = None
+
+        duration_str = ""
+        if p.action.lower() == "in":
+            in_time = p.ts
+        elif p.action.lower() == "out" and in_time:
+            delta = (p.ts - in_time).total_seconds()
+            duration_str = f"{int(delta//3600)}h {int((delta%3600)//60)}m"
+            total_for_day += delta
+            in_time = None
+        elif p.action.lower() == "break_in":
+            in_time = p.ts
+        elif p.action.lower() == "break_out" and in_time:
+            delta = (p.ts - in_time).total_seconds()
+            duration_str = f"BREAK {int(delta//3600)}h {int((delta%3600)//60)}m"
+            in_time = None
 
         writer.writerow([
-            p.employee.name if p.employee else "",
+            emp_name,
+            punch_date,
             p.department.name if p.department else "",
             p.location.name if p.location else "",
             p.action.upper(),
             p.m_number or "",
-            p.ts.strftime("%Y-%m-%d %H:%M:%S")
+            p.ts.strftime("%Y-%m-%d %H:%M:%S"),
+            duration_str
         ])
-        last_emp = p.employee.name if p.employee else None
+
+        last_emp, last_date = emp_name, punch_date
+
+    # Final total row
+    if last_emp and last_date:
+        writer.writerow([last_emp, last_date, "", "", "TOTAL", "", "", f"{round(total_for_day/3600,2)}h"])
 
     output.seek(0)
     return StreamingResponse(
         output,
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=attendance.csv"}
+        headers={"Content-Disposition": "attachment; filename=attendance_report.csv"}
     )
 
 @app.get("/")
