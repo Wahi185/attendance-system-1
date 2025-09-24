@@ -10,35 +10,32 @@
     body {
       background: radial-gradient(circle at center, #000 60%, #111 100%);
       color: #e0e0e0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans",
-                   "Apple Color Emoji", "Segoe UI Emoji";
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
     }
     .hal-eye {
-      width: 240px;
-      height: 240px;
+      width: 260px;
+      height: 260px;
       border-radius: 50%;
-      background: radial-gradient(circle at 30% 30%, #ff4444, #aa0000 60%, #000 100%);
-      box-shadow: 0 0 40px #ff0000, inset 0 0 40px #ff0000;
+      background: radial-gradient(circle at 30% 30%, #ff6666, #aa0000 65%, #000 100%);
+      box-shadow: 0 0 50px #ff0000, inset 0 0 50px #ff0000;
       position: relative;
+      margin: auto;
     }
-    /* circular viewport for the video */
-    .scanner-window {
-      position: absolute;
-      inset: 20px;              /* leave some glowing edge visible */
-      border-radius: 9999px;
-      overflow: hidden;         /* clip video inside the circle */
-    }
-    /* subtle animated pulse */
-    .hal-eye::after{
-      content:"";
-      position:absolute; inset:0;
-      border-radius:50%;
+    .hal-eye::after {
+      content: "";
+      position: absolute; inset: 0;
+      border-radius: 50%;
       box-shadow: 0 0 25px 5px rgba(255,0,0,.25);
-      animation: pulse 2.5s ease-in-out infinite;
+      animation: pulse 3s ease-in-out infinite;
     }
     @keyframes pulse {
       0%, 100% { box-shadow: 0 0 25px 5px rgba(255,0,0,.25); }
-      50%      { box-shadow: 0 0 45px 14px rgba(255,0,0,.35); }
+      50%      { box-shadow: 0 0 50px 15px rgba(255,0,0,.35); }
+    }
+    .scanner-window {
+      position: absolute; inset: 25px;
+      border-radius: 50%;
+      overflow: hidden;
     }
     .neon-btn {
       background: transparent;
@@ -46,13 +43,12 @@
       color: #0ff;
       padding: 0.5rem 1.25rem;
       border-radius: 10px;
-      font-weight: 700;
+      font-weight: bold;
       text-transform: uppercase;
       transition: all .15s linear;
       text-shadow: 0 0 6px #0ff;
     }
     .neon-btn:hover { background:#0ff; color:#000; box-shadow:0 0 18px #0ff; }
-
     select, input {
       background: #000;
       color: #0ff;
@@ -63,7 +59,10 @@
       outline: none;
     }
     label { color:#9ad; font-size:.9rem; margin-bottom:.25rem; display:block; }
-    #status div { margin-top:10px; padding:10px 12px; border-radius:10px; }
+    #status div {
+      margin-top: 10px; padding: 12px; border-radius: 10px;
+      font-size: 1rem; font-weight: 600;
+    }
   </style>
 </head>
 <body class="flex items-center justify-center min-h-screen">
@@ -72,7 +71,7 @@
       OPTIMIL QR TIME PUNCH
     </h1>
 
-    <!-- HAL Eye with circular scanner viewport -->
+    <!-- HAL Eye -->
     <div class="hal-eye">
       <div class="scanner-window">
         <div id="reader" class="w-full h-full"></div>
@@ -117,7 +116,7 @@
       <input id="mnumber" placeholder="Enter M Number"/>
     </div>
 
-    <!-- HR Export -->
+    <!-- Export -->
     <div class="mt-2">
       <button id="exportBtn" class="neon-btn">📊 Download Attendance (Excel)</button>
     </div>
@@ -125,7 +124,18 @@
 
   <script>
     const $ = (id) => document.getElementById(id);
-    const API = (path) => path;
+    const API_BASE = "https://attendance-system-1-1.onrender.com"; // 🔗 backend
+    const API = (path) => API_BASE + path;
+
+    function speak(text) {
+      try {
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.voice = speechSynthesis.getVoices().find(v => v.name.includes("Google UK English Male")) || null;
+        utter.pitch = 0.7;
+        utter.rate = 1.0;
+        speechSynthesis.speak(utter);
+      } catch {}
+    }
 
     function show(msg, ok=true) {
       $('status').innerHTML = `<div class="${ok?'bg-green-900 text-green-300':'bg-red-900 text-red-300'}">${msg}</div>`;
@@ -166,32 +176,8 @@
       return res.json();
     }
 
-    // tiny confirmation beep
-    function beep(){
-      try {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        const ctx = new AC();
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = 'sine'; o.frequency.value = 880;
-        o.connect(g); g.connect(ctx.destination);
-        g.gain.value = 0.0001;
-        o.start();
-        const t = ctx.currentTime;
-        g.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
-        o.stop(t + 0.2);
-      } catch {}
-    }
-
     let qr = null;
     let scanning = false;
-
-    function dynamicQrboxCalculator(viewfinderWidth, viewfinderHeight) {
-      // keep the scan box comfortably inside the circular window
-      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-      return Math.floor(minEdge * 0.8);
-    }
 
     async function startScanner() {
       if (scanning) return;
@@ -200,59 +186,25 @@
       try {
         if (qr) { try { await qr.stop(); } catch {} }
         qr = new Html5Qrcode("reader", { verbose: false });
-
         const cameras = await Html5Qrcode.getCameras();
-
-        // choose best back/wide camera when labels are available
-        let preferred = null;
-        if (cameras && cameras.length) {
-          for (const cam of cameras) {
-            const lbl = (cam.label || "").toLowerCase();
-            if (lbl.includes("back") || lbl.includes("rear") || lbl.includes("wide")) { preferred = cam.id; break; }
+        let preferred = cameras?.find(c => (c.label||"").toLowerCase().includes("back"))?.id || cameras?.[0]?.id;
+        await qr.start(
+          { deviceId: { exact: preferred } },
+          { fps: 20, qrbox: { width: 200, height: 200 } },
+          async (decodedText) => {
+            try {
+              if (qr) { try { await qr.stop(); } catch {} }
+              scanning = false;
+              const r = await postPunch(decodedText);
+              if (navigator.vibrate) navigator.vibrate(180);
+              show(`✅ ${r.employee}: ${r.action.toUpperCase()} at ${new Date(r.ts).toLocaleString()}`);
+              speak(`${r.employee}. ${r.action.toUpperCase()} recorded at ${new Date(r.ts).toLocaleTimeString()}`);
+            } catch (e) {
+              show("❌ " + e.message, false);
+              speak("Error. " + e.message);
+            }
           }
-          if (!preferred) preferred = cameras[cameras.length - 1].id; // fallback to last (often rear)
-        }
-
-        const config = {
-          fps: 24,
-          qrbox: dynamicQrboxCalculator,
-          // reduce throttling for snappier decode
-          aspectRatio: 1.0,
-          // disable duplicate suppression since we stop on first scan anyway
-        };
-
-        const onSuccess = async (decodedText) => {
-          try {
-            // stop ASAP to prevent multi reads
-            if (qr) { try { await qr.stop(); } catch {} }
-            scanning = false;
-
-            const r = await postPunch(decodedText);
-            if (navigator.vibrate) navigator.vibrate(180);
-            beep();
-            show(`✅ ${r.employee}: ${r.action.toUpperCase()} at ${new Date(r.ts).toLocaleString()}`);
-          } catch (e) {
-            show("❌ " + e.message, false);
-          }
-        };
-
-        // robust start sequence with fallbacks
-        try {
-          if (preferred) {
-            await qr.start({ deviceId: { exact: preferred } }, config, onSuccess);
-          } else {
-            // prefer environment if available
-            await qr.start({ facingMode: { exact: "environment" } }, config, onSuccess);
-          }
-        } catch {
-          try {
-            await qr.start({ facingMode: "environment" }, config, onSuccess);
-          } catch {
-            // final fallback: just start with any camera
-            await qr.start({ facingMode: "user" }, config, onSuccess);
-          }
-        }
-
+        );
         show("📷 Scanner ready. Present QR code…");
       } catch (e) {
         scanning = false;
@@ -271,7 +223,6 @@
     $('startBtn').addEventListener('click', startScanner);
     $('stopBtn').addEventListener('click', stopScanner);
     $('exportBtn').addEventListener('click', () => window.location.href = API('/api/export'));
-
     loadOptions();
   </script>
 </body>
